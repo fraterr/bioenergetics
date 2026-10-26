@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Activity, BookOpen, ChefHat, Github, Microscope, Settings } from 'lucide-react';
+import { Activity, ArrowRight, BookOpen, ChefHat, Compass, Github, Microscope, Settings, X } from 'lucide-react';
 import { useHashRoute, type Route } from './hooks/useHashRoute';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import type { FoodItem, MealEntry, PrepMethod } from './types';
@@ -8,9 +8,11 @@ import { MealBuilder, newUid } from './components/meal/MealBuilder';
 import { MetabolismView } from './components/metabolism/MetabolismView';
 import { MethodologyView } from './components/methodology/MethodologyView';
 import { SettingsModal } from './components/common/SettingsModal';
+import { GuideView } from './components/guide/GuideView';
 import { DEFAULT_METABOLIC_INPUT, type MetabolicInput } from './engine/metabolismEngine';
 
 const TABS: { id: Route; label: string; short: string; icon: typeof Activity }[] = [
+  { id: 'guide', label: 'How it works', short: 'Guide', icon: Compass },
   { id: 'foods', label: 'Food Encyclopedia', short: 'Foods', icon: Microscope },
   { id: 'meal', label: 'Meal Builder', short: 'Meal', icon: ChefHat },
   { id: 'metabolism', label: 'Metabolic Calculator', short: 'Metabolism', icon: Activity },
@@ -32,6 +34,7 @@ export default function App() {
   const [meal, setMeal] = useLocalStorage<MealEntry[]>('bioenergetics.meal', []);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [bodyMass, setBodyMass] = useState(readBodyMass);
+  const [welcomeDismissed, setWelcomeDismissed] = useLocalStorage('bioenergetics.welcomeDismissed', false);
 
   const addToMeal = useCallback(
     (food: FoodItem, grams: number, prep: PrepMethod) => setMeal((m) => [...m, { uid: newUid(), food, grams, prep }]),
@@ -58,7 +61,7 @@ export default function App() {
 
           <nav className="ml-auto hidden items-center gap-1 md:flex">
             {TABS.map((t) => (
-              <TabButton key={t.id} active={route === t.id} onClick={() => navigate(t.id)} icon={<t.icon size={15} />} label={t.label} badge={t.id === 'meal' && meal.length > 0 ? meal.length : undefined} />
+              <TabButton key={t.id} active={route === t.id} onClick={() => navigate(t.id)} icon={<t.icon size={15} />} label={t.label} short={t.short} badge={t.id === 'meal' && meal.length > 0 ? meal.length : undefined} />
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-1 md:ml-2">
@@ -70,7 +73,22 @@ export default function App() {
       </header>
 
       <main className="mx-auto max-w-[1480px] px-4 pb-28 pt-5 sm:px-6 md:pb-12">
+        {route !== 'guide' && !welcomeDismissed && (
+          <div className="mb-5 flex items-center gap-3 rounded-xl border border-nme/25 bg-nme/[0.06] px-4 py-3">
+            <Compass size={18} className="shrink-0 text-nme" />
+            <p className="flex-1 text-xs text-slate-300 sm:text-sm">
+              New here? Learn what BioEnergetics OS does and how to read its numbers in two minutes.
+            </p>
+            <button className="btn-primary shrink-0 px-2.5 py-1.5 text-xs" onClick={() => navigate('guide')}>
+              How it works <ArrowRight size={13} />
+            </button>
+            <button className="shrink-0 text-slate-500 hover:text-slate-200" onClick={() => setWelcomeDismissed(true)} aria-label="Dismiss">
+              <X size={16} />
+            </button>
+          </div>
+        )}
         <PageIntro route={route} />
+        {route === 'guide' && <GuideView navigate={navigate} />}
         {route === 'foods' && <EncyclopediaView onAddToMeal={addToMeal} bodyMassKg={bodyMass} />}
         {route === 'meal' && <MealBuilder meal={meal} setMeal={setMeal} bodyMassKg={bodyMass} />}
         {route === 'metabolism' && <MetabolismView onBodyMass={setBodyMass} />}
@@ -85,7 +103,7 @@ export default function App() {
       </footer>
 
       {/* Mobile tab bar */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-white/10 bg-void-950/95 backdrop-blur-xl md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-white/10 bg-void-950/95 backdrop-blur-xl md:hidden">
         {TABS.map((t) => (
           <button key={t.id} onClick={() => navigate(t.id)} className={`relative flex flex-col items-center gap-0.5 py-2.5 text-[10px] ${route === t.id ? 'text-nme' : 'text-slate-500'}`}>
             <t.icon size={18} />
@@ -100,7 +118,7 @@ export default function App() {
   );
 }
 
-function TabButton({ active, onClick, icon, label, badge }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string; badge?: number }) {
+function TabButton({ active, onClick, icon, label, short, badge }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string; short: string; badge?: number }) {
   return (
     <button
       onClick={onClick}
@@ -109,7 +127,8 @@ function TabButton({ active, onClick, icon, label, badge }: { active: boolean; o
       }`}
     >
       <span className={active ? 'text-nme' : ''}>{icon}</span>
-      {label}
+      <span className="xl:hidden">{short}</span>
+      <span className="hidden xl:inline">{label}</span>
       {badge !== undefined && <span className="num rounded-full bg-nme/20 px-1.5 text-[10px] text-nme">{badge}</span>}
       {active && <span className="absolute inset-x-3 -bottom-[13px] h-0.5 rounded-full bg-nme" />}
     </button>
@@ -117,6 +136,10 @@ function TabButton({ active, onClick, icon, label, badge }: { active: boolean; o
 }
 
 const INTROS: Record<Route, { title: string; text: string }> = {
+  guide: {
+    title: 'How BioEnergetics OS works',
+    text: 'What this site is, the science in plain words, and a step-by-step guide to each section.',
+  },
   foods: {
     title: 'Label Illusion vs Cellular Reality',
     text: 'Every food decomposed from Atwater label calories into digestible energy, Livesey Net Metabolizable Energy, net mitochondrial fuel and moles of ATP — with matrix, DIAAS and lipid-thermogenesis analysis.',
